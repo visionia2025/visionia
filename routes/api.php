@@ -1,0 +1,20 @@
+<?php
+
+use App\Http\Controllers\AuthController;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PasswordResetController;
+
+
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'userInfo']);
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+});
+
+Route::post('/password/request-reset', [PasswordResetController::class, 'requestReset']);
+Route::post('/password/reset', [PasswordResetController::class, 'resetPassword']);
