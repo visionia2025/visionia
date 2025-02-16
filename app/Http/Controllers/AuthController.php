@@ -13,12 +13,11 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'email' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
         if ($validator->fails()) {
             return response()->json([
                 'status' => 400,
@@ -26,6 +25,7 @@ class AuthController extends Controller
                 'errors' => $validator->errors()
             ], 400);
         }
+        $user = User::where('email', $request->email)->first();
         if (!$user) {
             return response()->json(['message' => 'Usuario no encontrado', 'status'=>'404'], 404);
         }
@@ -75,7 +75,7 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Error en los datos ingresados',
                 'errors' => $validator->errors()
-            ], 422);
+            ], 401);
         }
 
         // Verificar si el usuario tiene al menos 18 años
@@ -83,7 +83,7 @@ class AuthController extends Controller
         if ($birthdate->diffInYears(Carbon::now()) < 18) {
             return response()->json([
                 'message' => 'Debes tener al menos 18 años para registrarte'
-            ], 403);
+            ], 402);
         }
 
         // Crear usuario
@@ -91,6 +91,7 @@ class AuthController extends Controller
             'name' => $request->name,
             'birthdate' => $request->birthdate,
             'email' => $request->email,
+            'idRol' => 1,
             'password' => $request->password // Llega ya encriptada con SHA-256
         ]);
 
@@ -100,6 +101,6 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Usuario registrado exitosamente',
             'token' => $token
-        ], 201);
+        ], 200);
     }
 }
