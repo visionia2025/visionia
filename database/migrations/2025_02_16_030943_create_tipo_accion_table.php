@@ -15,7 +15,7 @@ class CreateTipoAccionTable extends Migration
     {
         Schema::create('tipo_accion', function (Blueprint $table) {
             $table->id();
-            $table->string('nombretipo', 255);
+            $table->string('nombretipo');
             $table->char('estado', 1)->default('1');
             $table->timestamps();
         });

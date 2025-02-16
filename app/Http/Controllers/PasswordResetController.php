@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\PasswordReset;
 use App\Models\PasswordChange;
 use Carbon\Carbon;
+use App\Models\TokenServices;
 
 class PasswordResetController extends Controller
 {
@@ -17,6 +18,18 @@ class PasswordResetController extends Controller
      */
     public function requestReset(Request $request)
     {
+        // Validar token en cabecera
+        $tokenHeader = $request->header('Authorization');
+        $token = str_replace('Bearer ', '', $tokenHeader);
+
+        $validToken = TokenServices::where('token', hash('sha256', $token))
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$validToken) {
+            return response()->json(['message' => 'Token no válido o expirado', 'status'=>401], 401);
+        }
+
         // Validar entrada
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
@@ -52,6 +65,18 @@ class PasswordResetController extends Controller
      */
     public function resetPassword(Request $request)
     {
+        // Validar token en cabecera
+        $tokenHeader = $request->header('Authorization');
+        $token = str_replace('Bearer ', '', $tokenHeader);
+
+        $validToken = TokenServices::where('token', hash('sha256', $token))
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$validToken) {
+            return response()->json(['message' => 'Token no válido o expirado', 'status'=>401], 401);
+        }
+
         // Validar entrada
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
@@ -69,11 +94,11 @@ class PasswordResetController extends Controller
             ->first();
 
         if (!$passwordReset || $passwordReset->expires_at < Carbon::now()) {
-            return response()->json(['status' => 'error', 'message' => 'Token inválido o expirado','status'=>401], 401);
+            return response()->json(['status' => 'error', 'message' => 'Token inválido o expirado','status'=>402], 402);
         }
 
         if ($passwordReset && $passwordReset->email != $request->email) {
-            return response()->json(['status' => 'error', 'message' => 'Token no es válido para el correo indicado','status'=>402], 402);
+            return response()->json(['status' => 'error', 'message' => 'Token no es válido para el correo indicado','status'=>403], 403);
         }
                
        

@@ -6,13 +6,69 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use App\Models\User;
 use Carbon\Carbon;
+use App\Models\UserService;
+use App\Models\TokenServices;
 
 class AuthController extends Controller
 {
+
+    public function generateToken(Request $request)
+    {
+        $request->validate([
+            'login' => 'required|string',
+            'password' => 'required|string'
+        ]);
+
+        $user = UserService::where('login', $request->login)->first();
+             
+        if (!$user || hash('sha256', $request->password) !== $user->password) {
+            return response()->json(['message' => 'Credenciales incorrectas','status'=>401], 401);
+        }
+
+        if ($user->status !== 1) {
+            return response()->json(['message' => 'Usuario inactivo','status'=>403], 403);
+        }
+        // Verificar si el usuario ya tiene un token activo
+        $existingToken = TokenServices::where('user_id', $user->id)
+        ->where('expires_at', '>', Carbon::now())
+        ->first();
+
+        if ($existingToken) {
+            // Eliminar el token anterior
+            $existingToken->delete();
+        }
+
+        // Generar token
+        $token = Str::random(60);
+        $expiresAt = Carbon::now()->addHours(24);
+        // Guardar en la base de datos
+        TokenServices::create([
+            'user_id' => $user->id,
+            'token' => hash('sha256', $token),
+            'expires_at' => $expiresAt
+        ]);
+
+        // Responder con el token en la cabecera
+        return response()->json(['message' => 'Token generado exitosamente','status'=>200,'token'=>$token]);
+    }
+
     public function login(Request $request)
     {
+        // Validar token en cabecera
+        $tokenHeader = $request->header('Authorization');
+        $token = str_replace('Bearer ', '', $tokenHeader);
+
+        $validToken = TokenServices::where('token', hash('sha256', $token))
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$validToken) {
+            return response()->json(['message' => 'Token no válido o expirado', 'status'=>401], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'email' => 'required|string',
             'password' => 'required|string',
@@ -31,7 +87,7 @@ class AuthController extends Controller
         }
 
         if ($user->password !== $request->password) {
-            return response()->json(['message' => 'Credenciales incorrectas', 'status'=>'401'], 401);
+            return response()->json(['message' => 'Credenciales incorrectas', 'status'=>'402'], 402);
         }       
 
         // Revoca tokens previos y genera uno nuevo
@@ -63,6 +119,18 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        // Validar token en cabecera
+        $tokenHeader = $request->header('Authorization');
+        $token = str_replace('Bearer ', '', $tokenHeader);
+
+        $validToken = TokenServices::where('token', hash('sha256', $token))
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$validToken) {
+            return response()->json(['message' => 'Token no válido o expirado', 'status'=>401], 401);
+        }
+
         // Validaciones
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -74,16 +142,18 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Error en los datos ingresados',
+                'status'=>402,
                 'errors' => $validator->errors()
-            ], 401);
+            ], 402);
         }
 
         // Verificar si el usuario tiene al menos 18 años
         $birthdate = Carbon::parse($request->birthdate);
         if ($birthdate->diffInYears(Carbon::now()) < 18) {
             return response()->json([
-                'message' => 'Debes tener al menos 18 años para registrarte'
-            ], 402);
+                'message' => 'Debes tener al menos 18 años para registrarte',
+                'status'=>403
+            ], 403);
         }
 
         // Crear usuario
@@ -100,6 +170,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Usuario registrado exitosamente',
+            'status'=>200,
             'token' => $token
         ], 200);
     }

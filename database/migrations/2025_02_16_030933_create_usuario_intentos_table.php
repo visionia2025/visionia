@@ -17,7 +17,7 @@ class CreateUsuarioIntentosTable extends Migration
             $table->id();
             $table->timestamp('fecha')->default(now());
             $table->foreignId('userId')->constrained('users')->onDelete('cascade');
-            $table->string('ip', 20);
+            $table->string('ip');
             $table->timestamps();
         });
     }

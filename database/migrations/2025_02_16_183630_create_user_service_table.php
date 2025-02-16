@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateTiporeconocimientoTable extends Migration
+class CreateUserServiceTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,10 +13,11 @@ class CreateTiporeconocimientoTable extends Migration
      */
     public function up()
     {
-        Schema::create('tiporeconocimiento', function (Blueprint $table) {
+        Schema::create('user_service', function (Blueprint $table) {
             $table->id();
-            $table->string('nombretipo');
-            $table->char('estado', 1)->default('1');
+            $table->string('login')->unique();
+            $table->string('password'); // Se guardará en SHA-256
+            $table->boolean('status')->default(1); // 1 = activo, 0 = inactivo
             $table->timestamps();
         });
     }
@@ -28,6 +29,6 @@ class CreateTiporeconocimientoTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('tiporeconocimiento');
+        Schema::dropIfExists('user_service');
     }
 }

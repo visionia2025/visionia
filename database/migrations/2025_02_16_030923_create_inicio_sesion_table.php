@@ -15,6 +15,9 @@ class CreateInicioSesionTable extends Migration
     {
         Schema::create('inicio_sesion', function (Blueprint $table) {
             $table->id();
+            $table->timestamp('fecha')->default(now());
+            $table->foreignId('userId')->constrained('users')->onDelete('cascade');
+            $table->string('ip');
             $table->timestamps();
         });
     }

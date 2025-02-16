@@ -15,6 +15,9 @@ class CreateReconocimientoTable extends Migration
     {
         Schema::create('reconocimiento', function (Blueprint $table) {
             $table->id();
+            $table->timestamp('fecha')->default(now());
+            $table->string('resultado')->nullable();
+            $table->foreignId('userId')->constrained('users')->onDelete('cascade');
             $table->timestamps();
         });
     }

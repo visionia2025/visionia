@@ -16,5 +16,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+Route::get('/get-token', [AuthController::class, 'generateToken']);
 Route::post('/password/request-reset', [PasswordResetController::class, 'requestReset']);
 Route::post('/password/reset', [PasswordResetController::class, 'resetPassword']);

@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateTiporeconocimientoTable extends Migration
+class AddTipoReconocimientoToReconocimientoTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,11 +13,8 @@ class CreateTiporeconocimientoTable extends Migration
      */
     public function up()
     {
-        Schema::create('tiporeconocimiento', function (Blueprint $table) {
-            $table->id();
-            $table->string('nombretipo');
-            $table->char('estado', 1)->default('1');
-            $table->timestamps();
+        Schema::table('reconocimiento', function (Blueprint $table) {
+            $table->foreignId('tipoReconocimientoId')->constrained('tiporeconocimiento')->onDelete('cascade');
         });
     }
 
@@ -28,6 +25,8 @@ class CreateTiporeconocimientoTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('tiporeconocimiento');
+        Schema::table('reconocimiento', function (Blueprint $table) {
+            //
+        });
     }
 }
