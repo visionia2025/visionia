@@ -11,9 +11,75 @@ use App\Models\User;
 use Carbon\Carbon;
 use App\Models\UserService;
 use App\Models\TokenServices;
+use App\Models\UsuarioIntento;
 
 class AuthController extends Controller
 {
+/**
+ * Inicio de sesión para la parte web, que sera usada por administradores*/
+    public function loginWeb(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+        $email = $request->email;
+        $ip = $request->ip();
+
+        $user = User::where('email', $email)->first();
+      
+        if($user){
+            $failedAttempts = $this->countIntentos($user->id);
+            if ($failedAttempts >= 3) {
+                return back()->withErrors(['email' => 'Cuenta bloqueada por intentos fallidos. Intente más tarde.'])->withInput();
+            }
+            if (hash('sha256', $request->password) == $user->password) {
+                $this->registerSesion($user->id,$ip);
+                return redirect()->intended('/dashboard');
+            }else{
+                $this->registerIntentFail($user->id,$ip);
+            }    
+        }else{
+            return back()->withErrors(['email' => 'El email no se encuentra registrado en el sistema'])->withInput();
+        }
+    }
+/**
+ * Contar los intentos de inicio de sesión
+ */
+    public function countIntentos($id){
+        return  UsuarioIntento::where('userId', $id)
+        ->where('fecha', '>=', now()->subMinutes(10))
+        ->count();
+    }
+/**
+ * Registrar los intentos fallidos de inicio de sesión
+ */
+    public function registerIntentFail($user_id,$ip){
+        return UsuarioIntento::create([
+            'userId' => $user_id,
+            'ip' => $ip,
+            'fecha' => now()
+        ]);
+    }
+/**
+ * Registrar el inicio de sesión exitoso
+ */
+    public function registerSesion($user_id,$ip){
+       return InicioSesion::create([
+            'userId' => $user_id,
+            'ip' => $ip,
+            'fecha' => now()
+        ]);
+    }
+
+/**
+ * Funcionalidad para finalizar la sesión en la parte web
+ */
+    public function logoutWeb()
+    {
+        Auth::logout();
+        return redirect('/login')->with('success', 'Sesión cerrada correctamente.');
+    }
 
     public function generateToken(Request $request)
     {
@@ -85,11 +151,20 @@ class AuthController extends Controller
         if (!$user) {
             return response()->json(['message' => 'Usuario no encontrado', 'status'=>'404'], 404);
         }
-
+        
+        $failedAttempts = $this->countIntentos($user->id);
+        if ($failedAttempts >= 3) {
+            return response()->json(['message' => 'Cuenta bloqueada por intentos fallidos. Intente más tarde.', 'status'=>'405'], 405);
+        }
+        $ip = '127.0.0.1';
         if ($user->password !== $request->password) {
+            $this->registerIntentFail($user->id,$ip);
+            //si genero error a registrar los intentos fallidos, si tiene 3 intentos fallidos inactivar la sesión por 10 minutos
             return response()->json(['message' => 'Credenciales incorrectas', 'status'=>'402'], 402);
         }       
 
+        //registrar en log el inicio de sesión
+        $this->registerSesion($user->id,$ip);
         // Revoca tokens previos y genera uno nuevo
         $user->tokens()->delete();
         // Crear token con vencimiento de 24 horas

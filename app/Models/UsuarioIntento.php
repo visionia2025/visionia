@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class UsuarioIntento extends Model {
     use HasFactory;
 
-    protected $table = 'usuarioIntentos';
+    protected $table = 'usuario_intentos';
     protected $fillable = ['fecha', 'userId', 'ip'];
 
     public function usuario() {

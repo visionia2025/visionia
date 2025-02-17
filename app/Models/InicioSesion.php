@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class InicioSesion extends Model {
     use HasFactory;
 
-    protected $table = 'inicioSesion';
+    protected $table = 'inicio_sesion';
     protected $fillable = ['fecha', 'userId', 'ip'];
 
     public function usuario() {
