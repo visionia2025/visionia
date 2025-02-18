@@ -5,8 +5,10 @@ use App\Http\Controllers\AuthController;
 
 
 Route::post('/custom-login', [AuthController::class, 'loginWeb'])->name('login.submit');
-
 Route::post('/logout', [AuthController::class, 'logoutWeb'])->name('logout');
+
+Route::get('/custom-register', [AuthController::class, 'showRegistrationForm'])->name('register.form');
+Route::post('/custom-register', [AuthController::class, 'registerWeb'])->name('register.submit');
 
 Route::get('/', function () {
     return view('auth.login');

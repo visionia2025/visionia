@@ -81,6 +81,32 @@ class AuthController extends Controller
         return redirect('/login')->with('success', 'Sesión cerrada correctamente.');
     }
 
+    public function showRegistrationForm()
+    {
+        return view('auth.register');
+    }
+
+    public function registerWeb(Request $request)
+    {
+        // Validación de datos
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'birthdate' => 'required|date',
+            'password' => 'required|string|min:6',
+        ]);
+
+        // Creación del usuario
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'birthdate' => $request->birthdate,
+            'idRol' => 1,
+            'password' => Hash::make($request->password),
+        ]);
+        return redirect()->route('login')->with('success', 'Registro exitoso. Ahora puedes iniciar sesión.');
+    }
+
     public function generateToken(Request $request)
     {
         $request->validate([
