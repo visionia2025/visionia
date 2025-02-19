@@ -12,6 +12,9 @@ use Carbon\Carbon;
 use App\Models\UserService;
 use App\Models\TokenServices;
 use App\Models\UsuarioIntento;
+use App\Models\InicioSesion;
+
+
 
 class AuthController extends Controller
 {
@@ -23,26 +26,36 @@ class AuthController extends Controller
             'email' => 'required|email',
             'password' => 'required',
         ]);
+
         $email = $request->email;
         $ip = $request->ip();
-
         $user = User::where('email', $email)->first();
-      
-        if($user){
-            $failedAttempts = $this->countIntentos($user->id);
-            if ($failedAttempts >= 3) {
-                return back()->withErrors(['email' => 'Cuenta bloqueada por intentos fallidos. Intente más tarde.'])->withInput();
-            }
-            if (hash('sha256', $request->password) == $user->password) {
-                $this->registerSesion($user->id,$ip);
-                return redirect()->intended('/dashboard');
-            }else{
-                $this->registerIntentFail($user->id,$ip);
-            }    
-        }else{
+
+        if (!$user) {
             return back()->withErrors(['email' => 'El email no se encuentra registrado en el sistema'])->withInput();
         }
+
+        $failedAttempts = $this->countIntentos($user->id);
+        if ($failedAttempts >= 3) {
+            return back()->withErrors(['email' => 'Cuenta bloqueada por intentos fallidos. Intente más tarde.'])->withInput();
+        }
+
+        // Si la contraseña en la BD aún está en SHA-256, la convierte a bcrypt antes de comparar
+        if (strlen($user->password) == 64 && ctype_xdigit($user->password)) {
+            $user->password = Hash::make($user->password);
+            $user->save(); // Guarda la contraseña en bcrypt
+        }
+
+        // Intentar autenticación con bcrypt
+        if (Auth::attempt(['email' => $email, 'password' => $request->password])) {
+            $this->registerSesion($user->id, $ip);
+            return redirect()->intended('/usuarios');
+        } else {
+            $this->registerIntentFail($user->id, $ip);
+            return back()->withErrors(['password' => 'Contraseña incorrecta'])->withInput();
+        }
     }
+
 /**
  * Contar los intentos de inicio de sesión
  */
