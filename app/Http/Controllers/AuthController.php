@@ -13,7 +13,7 @@ use App\Models\UserService;
 use App\Models\TokenServices;
 use App\Models\UsuarioIntento;
 use App\Models\InicioSesion;
-
+use Laravel\Sanctum\PersonalAccessToken;
 
 
 class AuthController extends Controller
@@ -192,7 +192,7 @@ class AuthController extends Controller
         }
         
         $failedAttempts = $this->countIntentos($user->id);
-        if ($failedAttempts >= 3) {
+        if ($failedAttempts >= 4) {
             return response()->json(['message' => 'Cuenta bloqueada por intentos fallidos. Intente más tarde.', 'status'=>'405'], 405);
         }
         $ip = '127.0.0.1';
@@ -206,12 +206,14 @@ class AuthController extends Controller
         $this->registerSesion($user->id,$ip);
         // Revoca tokens previos y genera uno nuevo
         $user->tokens()->delete();
-        // Crear token con vencimiento de 24 horas
-        $token = $user->createToken('auth_token', ['*'], now()->addDay())->plainTextToken;
+
+        $newToken = explode('|',$user->createToken('auth_token', ['*'], now()->addDay())->plainTextToken)[1];
+        
+        // Obtener el ID del token
         return response()->json([
             'message' => 'Inicio de sesión exitoso',
             'status' => 200,
-            'token' => $token,
+            'token' => $newToken,
             'token_type' => 'Bearer',
             'expires_at' => now()->addDay(),
         ]);
@@ -248,11 +250,11 @@ class AuthController extends Controller
         // Validaciones
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'birthdate' => 'required|date',
-            'email' => 'required|email|unique:users,email',
+            'birthdate' => 'required|date|before_or_equal:' . now()->subYears(18)->format('Y-m-d'),
+            'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8'
         ]);
-
+        
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Error en los datos ingresados',
@@ -276,7 +278,7 @@ class AuthController extends Controller
             'birthdate' => $request->birthdate,
             'email' => $request->email,
             'idRol' => 1,
-            'password' => $request->password // Llega ya encriptada con SHA-256
+            'password' => Hash::make($request->password)
         ]);
 
         // Generar token de autenticación
@@ -287,5 +289,79 @@ class AuthController extends Controller
             'status'=>200,
             'token' => $token
         ], 200);
+    }
+
+    public function update(Request $request)
+    {
+        // Validar los tokens en la cabecera
+        $tokenHeader = $request->header('Authorization');
+        $authToken = str_replace('Bearer ', '', $tokenHeader);
+        $secondToken = $request->header('Second-Authorization');
+
+        if (!$authToken || !$secondToken) {
+            return response()->json(['message' => 'Ambos tokens son requeridos', 'status' => 401], 401);
+        }
+
+        // Verificar el primer token
+        $validFirstToken = TokenServices::where('token', hash('sha256', $authToken))
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$validFirstToken) {
+            return response()->json(['message' => 'Primer token no válido o expirado', 'status' => 402], 402);
+        }
+
+        // Verificar el segundo token (login)
+        $validSecondToken = PersonalAccessToken::where('token', hash('sha256',$secondToken))
+            ->first();
+
+        if (!$validSecondToken) {
+            return response()->json(['message' => 'Segundo token no válido o expirado', 'status' => 403], 403);
+        }
+
+        // Obtener el ID del usuario
+        $user = User::find($validSecondToken->tokenable_id);
+
+        if (!$user) {
+            return response()->json(['message' => 'Usuario no encontrado', 'status' => 404], 404);
+        }
+
+        // Validar los datos recibidos
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'password' => 'sometimes|string|min:8',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 400,
+                'message' => 'Error en los datos ingresados',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // Actualizar los datos del usuario
+        if ($request->has('name')) {
+            $user->name = $request->name;
+        }
+        if ($request->has('email')) {
+            $user->email = $request->email;
+        }
+        
+        if ($request->has('password')) {
+            $user->password = Hash::make($request->password);
+        }
+        
+        if ($request->has('birthdate')) {
+            $user->birthdate = $request->birthdate;
+        }
+        $user->save();
+
+        return response()->json([
+            'message' => 'Usuario actualizado correctamente',
+            'status' => 200,
+            'user' => $user
+        ]);
     }
 }
